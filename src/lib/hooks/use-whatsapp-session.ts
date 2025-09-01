@@ -43,7 +43,7 @@ export function useWhatsAppSession() {
     }
   }, [user?.id]);
 
-  // Connecter WhatsApp
+  // Connecter WhatsApp via votre API VPS
   const connect = useCallback(async () => {
     if (!user?.id) throw new Error('Utilisateur non connecté');
     
@@ -80,20 +80,20 @@ export function useWhatsAppSession() {
         error: undefined
       });
       
-      // 3. Appeler l'API backend pour générer le QR
-      const BACKEND_URL = 'https://whalix-server-railway-production.up.railway.app';
-      const response = await fetch(`${BACKEND_URL}/api/session/create`, {
+      // 3. Appeler VOTRE API VPS pour générer le QR
+      const VPS_API_URL = import.meta.env.VITE_VPS_API_URL || 'https://your-vps-api.com';
+      const response = await fetch(`${VPS_API_URL}/api/whatsapp/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          restaurantId: currentUser.tenant_id,
           tenantId: currentUser.tenant_id,
-          userId: currentUser.id
+          userId: currentUser.id,
+          businessName: currentUser.tenant.name
         })
       });
       
       if (!response.ok) {
-        throw new Error(`Erreur serveur: ${response.status}`);
+        throw new Error(`Erreur API VPS: ${response.status}`);
       }
       
       const data = await response.json();
@@ -140,12 +140,12 @@ export function useWhatsAppSession() {
     }
   }, [user?.id]);
 
-  // Polling pour vérifier le statut
+  // Polling pour vérifier le statut via votre API VPS
   const startStatusPolling = useCallback((tenantId: string, userId: string) => {
     const checkStatus = async () => {
       try {
-        const BACKEND_URL = 'https://whalix-server-railway-production.up.railway.app';
-        const response = await fetch(`${BACKEND_URL}/api/whatsapp/status/${tenantId}`);
+        const VPS_API_URL = import.meta.env.VITE_VPS_API_URL || 'https://your-vps-api.com';
+        const response = await fetch(`${VPS_API_URL}/api/whatsapp/status/${tenantId}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -232,7 +232,7 @@ export function useWhatsAppSession() {
     }, 3000);
   }, []);
 
-  // Déconnecter
+  // Déconnecter via votre API VPS
   const disconnect = useCallback(async () => {
     if (!user?.id) return;
     
@@ -240,9 +240,9 @@ export function useWhatsAppSession() {
       const currentUser = await supabaseService.getCurrentUser();
       if (!currentUser) return;
       
-      // Déconnecter côté serveur
-      const BACKEND_URL = 'https://whalix-server-railway-production.up.railway.app';
-      await fetch(`${BACKEND_URL}/api/whatsapp/disconnect/${currentUser.tenant_id}`, {
+      // Déconnecter côté VPS
+      const VPS_API_URL = import.meta.env.VITE_VPS_API_URL || 'https://your-vps-api.com';
+      await fetch(`${VPS_API_URL}/api/whatsapp/disconnect/${currentUser.tenant_id}`, {
         method: 'POST'
       });
       

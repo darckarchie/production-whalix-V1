@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { baileysService } from '@/lib/services/baileys-integration';
 import { LiveReply } from '../types';
 
 export function useLiveFeed(businessId: string) {
@@ -22,55 +21,67 @@ export function useLiveFeed(businessId: string) {
 
   // Écouter les nouveaux messages du serveur Baileys
   useEffect(() => {
-    const unsubscribeMessages = baileysService.onMessageReceived(businessId, (message) => {
-      const newMessage: LiveReply = {
-        id: message.id,
-        at: new Date(message.timestamp).toISOString(),
-        customer: message.pushName || 'Client',
-        customer_phone: message.from,
-        last_message: message.text,
-        status: 'waiting',
-        confidence: 0
-      };
-      
-      setMessages(prev => {
-        const existing = prev.find(m => m.id === message.id);
-        if (existing) return prev;
+    // Écouter les messages via votre API VPS (WebSocket ou polling)
+    const connectToVPSFeed = async () => {
+      try {
+        const VPS_API_URL = import.meta.env.VITE_VPS_API_URL || 'https://your-vps-api.com';
         
-        const updated = [newMessage, ...prev].slice(0, 20);
-        localStorage.setItem('whalix_live_messages', JSON.stringify(updated));
-        return updated;
-      });
-    });
-
-    const unsubscribeAI = baileysService.onAIReply(businessId, (replyData) => {
-      setMessages(prev => prev.map(msg => 
-        msg.id === replyData.messageId 
-          ? { ...msg, status: 'ai_replied', reply_preview: replyData.reply, confidence: replyData.confidence }
-          : msg
-      ));
-    });
-
+        // Polling pour récupérer les nouveaux messages
+        const interval = setInterval(async () => {
+          try {
+            const response = await fetch(`${VPS_API_URL}/api/messages/recent/${businessId}`);
+            if (response.ok) {
+              const newMessages = await response.json();
+              
+              if (newMessages.length > 0) {
+                setMessages(prev => {
+                  const existingIds = prev.map(m => m.id);
+                  const filtered = newMessages.filter((m: any) => !existingIds.includes(m.id));
+                  const updated = [...filtered, ...prev].slice(0, 20);
+                  localStorage.setItem('whalix_live_messages', JSON.stringify(updated));
+                  return updated;
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Erreur récupération messages VPS:', error);
+          }
+        }, 5000); // Polling toutes les 5 secondes
+        
+        return () => clearInterval(interval);
+      } catch (error) {
+        console.error('Erreur connexion VPS feed:', error);
+        return () => {};
+      }
+    };
+    
+    const cleanup = connectToVPSFeed();
     return () => {
-      unsubscribeMessages();
-      unsubscribeAI();
+      cleanup.then(fn => fn());
     };
   }, [businessId]);
 
   const fetchMessages = useCallback(async () => {
     try {
-      // Vérifier la connexion au serveur Baileys
-      const session = baileysService.getSession(businessId);
-      if (session?.status === 'connected') {
-        setIsConnected(true);
-        setError(null);
+      // Vérifier la connexion via votre API VPS
+      const VPS_API_URL = import.meta.env.VITE_VPS_API_URL || 'https://your-vps-api.com';
+      const response = await fetch(`${VPS_API_URL}/api/whatsapp/status/${businessId}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'connected') {
+          setIsConnected(true);
+          setError(null);
+        } else {
+          setIsConnected(false);
+        }
       } else {
         setIsConnected(false);
       }
     } catch (err) {
-      console.error('Erreur vérification serveur Baileys:', err);
+      console.error('Erreur vérification API VPS:', err);
       setIsConnected(false);
-      setError('Serveur Baileys non disponible');
+      setError('API VPS non disponible');
     }
   }, [businessId]);
 

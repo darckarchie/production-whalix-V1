@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useWhatsAppSession } from '@/lib/hooks/use-whatsapp-session';
-import { useMetrics } from '@/components/dashboard/MetricsProvider';
 import { 
   MessageSquare, 
   QrCode, 
@@ -26,7 +25,6 @@ interface WhatsAppConnectionCardProps {
 
 export function WhatsAppConnectionCard({ restaurantId, onStatusChange }: WhatsAppConnectionCardProps) {
   const { session, isLoading, connect, disconnect, error } = useWhatsAppSession();
-  const { logEvent } = useMetrics();
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   
   const addDebugLog = (message: string) => {
@@ -49,7 +47,6 @@ export function WhatsAppConnectionCard({ restaurantId, onStatusChange }: WhatsAp
     addDebugLog('1. Début connexion WhatsApp...');
     try {
       await connect();
-      await logEvent('qr_generated', { timestamp: new Date().toISOString() });
       addDebugLog('✅ Connexion initiée avec succès');
     } catch (error) {
       addDebugLog(`❌ Erreur: ${error}`);
@@ -60,7 +57,6 @@ export function WhatsAppConnectionCard({ restaurantId, onStatusChange }: WhatsAp
     addDebugLog('Déconnexion...');
     try {
       await disconnect();
-      await logEvent('connection_closed', { manual: true });
       addDebugLog('✅ Déconnecté avec succès');
     } catch (error) {
       addDebugLog(`❌ Erreur déconnexion: ${error}`);
